@@ -106,7 +106,12 @@ offset = 0
 class TelegramAPI:
     def __init__(self, token: str):
         self.base_url = f"https://api.telegram.org/bot{token}"
-        self.client = httpx.AsyncClient(timeout=30)
+        proxy = os.getenv("PROXY_URL")
+        if proxy:
+            self.client = httpx.AsyncClient(timeout=30, proxy=proxy)
+            print(f"🔗 استفاده از پروکسی: {proxy}")
+        else:
+            self.client = httpx.AsyncClient(timeout=30)
 
     async def get_updates(self, offset: int = 0):
         url = f"{self.base_url}/getUpdates"
@@ -357,6 +362,13 @@ async def process_message(api: TelegramAPI, msg: dict):
     db_create_user(user_id, username, first_name)
     state = user_states.get(user_id, "idle")
 
+    # ── لغو ویزار ──
+    if text in ["/cancel", "لغو", "❌"]:
+        user_states[user_id] = "idle"
+        user_data.pop(user_id, None)
+        await api.send_message(chat_id, "✅ لغو شد")
+        return
+
     # ── دستورات ──
 
     if text == "/start":
@@ -373,7 +385,8 @@ async def process_message(api: TelegramAPI, msg: dict):
             "/today - برنامه امروز\n/schedule - زمان‌بندی\n"
             "/done - انجام کار\n/delete - حذف\n"
             "/fixed - رویداد ثابت\n/fixedlist - لیست رویدادها\n"
-            "/settings - تنظیمات\n/sethours - ساعت کاری", "Markdown")
+            "/settings - تنظیمات\n/sethours - ساعت کاری\n"
+            "/cancel - لغو عملیات", "Markdown")
 
     elif text == "/list":
         tasks = db_pending(user_id)
